@@ -2,6 +2,14 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { Header } from "@/components/layout/Header";
+import { BottomNav } from "@/components/layout/BottomNav";
+import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
+import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { Toast } from "@/components/ui/Toast";
+import { useToast } from "@/hooks/useToast";
+import { useDebounce } from "@/hooks/useDebounce";
 
 interface Record {
   id: number;
@@ -12,7 +20,7 @@ interface Record {
   image: string;
 }
 
-// Mock data as fallback
+// Mock data - will be replaced with database in production
 const mockRecords: Record[] = [
   {
     id: 1,
@@ -144,24 +152,37 @@ const mockRecords: Record[] = [
   },
 ];
 
-export default function Home() {
+function HomeContent() {
   const [searchQuery, setSearchQuery] = useState("");
   const [records, setRecords] = useState<Record[]>(mockRecords);
   const [isSearching, setIsSearching] = useState(false);
   const [searchPerformed, setSearchPerformed] = useState(false);
+  const { toast, showToast, hideToast } = useToast();
 
-  // Auto-search if URL has search parameter
+  // Debounce search query (waits 500ms after user stops typing)
+  const debouncedSearchQuery = useDebounce(searchQuery, 500);
+
+  // Execute search when debounced query changes
+  useEffect(() => {
+    if (debouncedSearchQuery && debouncedSearchQuery.trim()) {
+      executeSearch(debouncedSearchQuery);
+    }
+  }, [debouncedSearchQuery]);
+
+  // Handle URL-based search on mount
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const searchFromUrl = urlParams.get("search");
 
     if (searchFromUrl) {
       setSearchQuery(searchFromUrl);
-      handleSearchFromUrl(searchFromUrl);
+      executeSearch(searchFromUrl);
     }
   }, []);
 
-  const handleSearchFromUrl = async (query: string) => {
+  const executeSearch = async (query: string) => {
+    if (!query.trim()) return;
+
     setIsSearching(true);
     setSearchPerformed(true);
 
@@ -172,49 +193,32 @@ export default function Home() {
         body: JSON.stringify({ query }),
       });
 
+      if (!response.ok) {
+        throw new Error("Search failed");
+      }
+
       const data = await response.json();
 
       if (data.success && data.records) {
         setRecords(data.records);
+        if (data.records.length === 0) {
+          showToast(`No results found for "${query}"`, "info");
+        }
       } else {
-        setRecords([]);
+        throw new Error(data.error || "Search failed");
       }
     } catch (err) {
       console.error("Search failed:", err);
+      showToast("Search failed. Please try again.", "error");
       setRecords([]);
     } finally {
       setIsSearching(false);
     }
   };
 
-  const handleSearch = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!searchQuery.trim()) return;
-
-    setIsSearching(true);
-    setSearchPerformed(true);
-
-    try {
-      const response = await fetch("/api/search-records", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query: searchQuery }),
-      });
-
-      const data = await response.json();
-
-      if (data.success && data.records) {
-        setRecords(data.records);
-      } else {
-        setRecords([]);
-      }
-    } catch (err) {
-      console.error("Search failed:", err);
-      setRecords([]);
-    } finally {
-      setIsSearching(false);
-    }
+  const handleSearch = (query: string) => {
+    setSearchQuery(query);
+    // Actual search is triggered by useEffect watching debouncedSearchQuery
   };
 
   const resetSearch = () => {
@@ -225,51 +229,13 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white border-b sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-4 py-3">
-          <div className="flex items-center gap-6">
-            <h1
-              className="text-2xl font-normal cursor-pointer text-gray-900 flex-shrink-0"
-              onClick={resetSearch}
-            >
-              OFF/BEAT
-            </h1>
-
-            {/* Search Bar */}
-            <form onSubmit={handleSearch} className="flex-1 max-w-2xl">
-              <div className="relative">
-                <input
-                  type="text"
-                  placeholder="Search for records..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full px-4 py-2 pl-10 bg-gray-100 focus:outline-none focus:ring-1 focus:ring-gray-900 text-gray-900 text-sm"
-                />
-                <svg
-                  className="absolute left-3 top-2.5 w-4 h-4 text-gray-500"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                  />
-                </svg>
-              </div>
-            </form>
-          </div>
-        </div>
-      </div>
+      <Header onSearch={handleSearch} />
 
       {/* Hero Section - Only show when not searching */}
       {!searchPerformed && (
         <div className="relative h-80 overflow-hidden">
           <img
-            src="/hero4.jpg"
+            src="/images/hero.jpg"
             alt="CTA subway stairs"
             className="w-full h-full object-cover"
           />
@@ -280,10 +246,10 @@ export default function Home() {
           <div className="absolute inset-0 flex items-center justify-start px-8">
             <div className="text-left text-white max-w-md border-l border-black border-opacity-50 pl-6">
               <h2 className="text-4xl md:text-5xl font-normal mb-3">
-                Album of the Week
+                The Edit
               </h2>
               <p className="text-lg md:text-xl font-normal text-gray-200">
-                African Skies - Phil Cohran Legacy
+                Weekly thoughts on sound and collecting
               </p>
             </div>
           </div>
@@ -292,24 +258,22 @@ export default function Home() {
 
       {/* Loading State */}
       {isSearching && (
-        <div className="max-w-7xl mx-auto px-4 py-12 text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mx-auto mb-4"></div>
-          <p className="text-gray-700 font-medium">Searching records...</p>
+        <div className="max-w-7xl mx-auto px-4">
+          <LoadingSpinner message="Searching records..." />
         </div>
       )}
 
       {/* No Results */}
       {!isSearching && searchPerformed && records.length === 0 && (
-        <div className="max-w-7xl mx-auto px-4 py-12 text-center">
-          <p className="text-gray-700 mb-4 font-medium">
-            No records found for "{searchQuery}"
-          </p>
-          <button
-            onClick={resetSearch}
-            className="text-blue-600 hover:underline font-medium"
-          >
-            Back to browse
-          </button>
+        <div className="max-w-7xl mx-auto px-4">
+          <EmptyState
+            title={`No records found for "${searchQuery}"`}
+            description="Try searching for a different artist or album"
+            action={{
+              label: "Back to browse",
+              onClick: resetSearch,
+            }}
+          />
         </div>
       )}
 
@@ -365,59 +329,20 @@ export default function Home() {
         </div>
       )}
 
-      {/* Bottom Navigation */}
-      <div
-        className="fixed bottom-0 left-0 right-0 border-t border-gray-800"
-        style={{ backgroundColor: "#1E1E1E" }}
-      >
-        <div className="max-w-7xl mx-auto px-4">
-          <div className="flex justify-around py-3">
-            <Link
-              href="/"
-              className="flex flex-col items-center gap-1 text-white"
-            >
-              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                <path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z" />
-              </svg>
-              <span className="text-xs font-normal">Home</span>
-            </Link>
-            <button className="flex flex-col items-center gap-1 text-gray-400">
-              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                <path d="M8.433 7.418c.155-.103.346-.196.567-.267v1.698a2.305 2.305 0 01-.567-.267C8.07 8.34 8 8.114 8 8c0-.114.07-.34.433-.582zM11 12.849v-1.698c.22.071.412.164.567.267.364.243.433.468.433.582 0 .114-.07.34-.433.582a2.305 2.305 0 01-.567.267z" />
-                <path
-                  fillRule="evenodd"
-                  d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-13a1 1 0 10-2 0v.092a4.535 4.535 0 00-1.676.662C6.602 6.234 6 7.009 6 8c0 .99.602 1.765 1.324 2.246.48.32 1.054.545 1.676.662v1.941c-.391-.127-.68-.317-.843-.504a1 1 0 10-1.51 1.31c.562.649 1.413 1.076 2.353 1.253V15a1 1 0 102 0v-.092a4.535 4.535 0 001.676-.662C13.398 13.766 14 12.991 14 12c0-.99-.602-1.765-1.324-2.246A4.535 4.535 0 0011 9.092V7.151c.391.127.68.317.843.504a1 1 0 101.511-1.31c-.563-.649-1.413-1.076-2.354-1.253V5z"
-                  clipRule="evenodd"
-                />
-              </svg>
-              <span className="text-xs font-normal">Sell</span>
-            </button>
-            <Link
-              href="/messages"
-              className="flex flex-col items-center gap-1 text-gray-400"
-            >
-              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                <path d="M2 5a2 2 0 012-2h7a2 2 0 012 2v4a2 2 0 01-2 2H9l-3 3v-3H4a2 2 0 01-2-2V5z" />
-                <path d="M15 7v2a4 4 0 01-4 4H9.828l-1.766 1.767c.28.149.599.233.938.233h2l3 3v-3h2a2 2 0 002-2V9a2 2 0 00-2-2h-1z" />
-              </svg>
-              <span className="text-xs font-normal">Messages</span>
-            </Link>
-            <Link
-              href="/profile"
-              className="flex flex-col items-center gap-1 text-gray-400"
-            >
-              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                <path
-                  fillRule="evenodd"
-                  d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z"
-                  clipRule="evenodd"
-                />
-              </svg>
-              <span className="text-xs font-normal">Profile</span>
-            </Link>
-          </div>
-        </div>
-      </div>
+      <BottomNav activePage="home" />
+
+      {/* Toast Notifications */}
+      {toast && (
+        <Toast message={toast.message} type={toast.type} onClose={hideToast} />
+      )}
     </div>
+  );
+}
+
+export default function Home() {
+  return (
+    <ErrorBoundary>
+      <HomeContent />
+    </ErrorBoundary>
   );
 }
