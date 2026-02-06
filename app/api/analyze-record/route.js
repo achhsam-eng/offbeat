@@ -1,16 +1,14 @@
-"use server";
-
 export const runtime = 'nodejs';
 export const maxDuration = 60;
 
 import Anthropic from '@anthropic-ai/sdk';
 
-// Rest of your code stays the same...
-// Rest of your code...
-
-// Debug logging
-console.log('ANTHROPIC_API_KEY exists:', !!process.env.ANTHROPIC_API_KEY);
-console.log('ANTHROPIC_API_KEY first 10 chars:', process.env.ANTHROPIC_API_KEY?.substring(0, 10));
+// Enhanced debug logging
+console.log('=== ANTHROPIC API KEY CHECK ===');
+console.log('Key exists:', !!process.env.ANTHROPIC_API_KEY);
+console.log('Key length:', process.env.ANTHROPIC_API_KEY?.length);
+console.log('Key starts with:', process.env.ANTHROPIC_API_KEY?.substring(0, 15));
+console.log('===============================');
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -76,7 +74,6 @@ If you don't recognize this specific release, use web search to find information
     ]
   });
   
-  // Handle tool use - extract text from all content blocks
   let finalText = '';
   for (const block of message.content) {
     if (block.type === 'text') {
