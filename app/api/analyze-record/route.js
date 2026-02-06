@@ -1,8 +1,11 @@
+"use server";
+
 export const runtime = 'nodejs';
-export const maxDuration = 60; // 60 seconds for AI processing
+export const maxDuration = 60;
 
 import Anthropic from '@anthropic-ai/sdk';
 
+// Rest of your code stays the same...
 // Rest of your code...
 
 // Debug logging
