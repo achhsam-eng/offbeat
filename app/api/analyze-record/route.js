@@ -3,10 +3,6 @@ export const maxDuration = 60;
 
 import Anthropic from '@anthropic-ai/sdk';
 
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-});
-
 async function searchDiscogs(query) {
   const url = `https://api.discogs.com/database/search?q=${encodeURIComponent(query)}&type=release&token=${process.env.DISCOGS_TOKEN}`;
   
@@ -30,6 +26,18 @@ async function getReleaseDetails(resourceUrl) {
 }
 
 async function getExplanation(recordData) {
+  // TEST 1: Log the API key
+  console.log('=== ENV VAR TEST ===');
+  console.log('ANTHROPIC_API_KEY exists:', !!process.env.ANTHROPIC_API_KEY);
+  console.log('ANTHROPIC_API_KEY length:', process.env.ANTHROPIC_API_KEY?.length);
+  console.log('ANTHROPIC_API_KEY first 30 chars:', process.env.ANTHROPIC_API_KEY?.substring(0, 30));
+  console.log('===================');
+
+  // TEST 2: Initialize Anthropic inside the function
+  const anthropic = new Anthropic({
+    apiKey: process.env.ANTHROPIC_API_KEY,
+  });
+
   const wantCount = recordData.community?.want || 0;
   const haveCount = recordData.community?.have || 0;
   const demand = wantCount > haveCount ? "high demand" : wantCount > haveCount * 0.5 ? "moderate demand" : "relatively available";
@@ -39,12 +47,9 @@ async function getExplanation(recordData) {
     : "Not currently available for sale on the marketplace";
   
   try {
-    console.log('=== ANTHROPIC API CALL DEBUG ===');
     console.log('About to call Anthropic API...');
-    console.log('API Key exists:', !!process.env.ANTHROPIC_API_KEY);
-    console.log('API Key first 20 chars:', process.env.ANTHROPIC_API_KEY?.substring(0, 20));
-    console.log('================================');
     
+    // TEST 3: Remove web_search to test permissions
     const message = await anthropic.messages.create({
       model: "claude-sonnet-4-20250514",
       max_tokens: 1024,
@@ -63,15 +68,10 @@ Genre/Style: ${recordData.genre?.join(', ') || 'Unknown'} / ${recordData.style?.
 Community stats: ${haveCount} people own this, ${wantCount} people want it (${demand})
 Pricing: ${pricingInfo}
 
-If you don't recognize this specific release, use web search to find information from music review sites like Pitchfork, Stereogum, AllMusic, RateYourMusic, or The Quietus. Focus on sonic characteristics, genre placement, and critical reception. Give specific musical context - what does this artist/album actually sound like? What subgenre, influences, or sonic characteristics define them? Then briefly touch on label reputation, rarity/collectibility, and pricing. Keep it 3-4 sentences and conversational.`
-        }
-      ],
-      tools: [
-        {
-          "type": "web_search_20250305",
-          "name": "web_search"
+Based on this information, provide a brief 2-3 sentence description of this record, covering its sonic characteristics, genre placement, and collectibility. Keep it conversational.`
         }
       ]
+      // NO TOOLS - removed web_search
     });
     
     console.log('Anthropic API call succeeded!');
