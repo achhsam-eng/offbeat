@@ -3,13 +3,6 @@ export const maxDuration = 60;
 
 import Anthropic from '@anthropic-ai/sdk';
 
-// Enhanced debug logging
-console.log('=== ANTHROPIC API KEY CHECK ===');
-console.log('Key exists:', !!process.env.ANTHROPIC_API_KEY);
-console.log('Key length:', process.env.ANTHROPIC_API_KEY?.length);
-console.log('Key starts with:', process.env.ANTHROPIC_API_KEY?.substring(0, 15));
-console.log('===============================');
-
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 });
@@ -45,13 +38,20 @@ async function getExplanation(recordData) {
     ? `Lowest current price: $${recordData.lowest_price} (${recordData.num_for_sale} available for sale)`
     : "Not currently available for sale on the marketplace";
   
-  const message = await anthropic.messages.create({
-    model: "claude-sonnet-4-20250514",
-    max_tokens: 1024,
-    messages: [
-      {
-        role: "user",
-        content: `You're a knowledgeable record store employee helping a customer understand this specific record. Don't explain basic vinyl terminology unless it's unusual.
+  try {
+    console.log('=== ANTHROPIC API CALL DEBUG ===');
+    console.log('About to call Anthropic API...');
+    console.log('API Key exists:', !!process.env.ANTHROPIC_API_KEY);
+    console.log('API Key first 20 chars:', process.env.ANTHROPIC_API_KEY?.substring(0, 20));
+    console.log('================================');
+    
+    const message = await anthropic.messages.create({
+      model: "claude-sonnet-4-20250514",
+      max_tokens: 1024,
+      messages: [
+        {
+          role: "user",
+          content: `You're a knowledgeable record store employee helping a customer understand this specific record. Don't explain basic vinyl terminology unless it's unusual.
 
 Record: ${recordData.title}
 Year: ${recordData.year}
@@ -64,24 +64,35 @@ Community stats: ${haveCount} people own this, ${wantCount} people want it (${de
 Pricing: ${pricingInfo}
 
 If you don't recognize this specific release, use web search to find information from music review sites like Pitchfork, Stereogum, AllMusic, RateYourMusic, or The Quietus. Focus on sonic characteristics, genre placement, and critical reception. Give specific musical context - what does this artist/album actually sound like? What subgenre, influences, or sonic characteristics define them? Then briefly touch on label reputation, rarity/collectibility, and pricing. Keep it 3-4 sentences and conversational.`
+        }
+      ],
+      tools: [
+        {
+          "type": "web_search_20250305",
+          "name": "web_search"
+        }
+      ]
+    });
+    
+    console.log('Anthropic API call succeeded!');
+    
+    let finalText = '';
+    for (const block of message.content) {
+      if (block.type === 'text') {
+        finalText += block.text;
       }
-    ],
-    tools: [
-      {
-        "type": "web_search_20250305",
-        "name": "web_search"
-      }
-    ]
-  });
-  
-  let finalText = '';
-  for (const block of message.content) {
-    if (block.type === 'text') {
-      finalText += block.text;
     }
+    
+    return finalText;
+  } catch (error) {
+    console.error('=== ANTHROPIC API ERROR ===');
+    console.error('Error:', error);
+    console.error('Error message:', error.message);
+    console.error('Error status:', error.status);
+    console.error('Error type:', error.type);
+    console.error('=========================');
+    throw error;
   }
-  
-  return finalText;
 }
 
 export async function POST(request) {
@@ -114,6 +125,11 @@ export async function POST(request) {
     });
     
   } catch (error) {
+    console.error('=== MAIN HANDLER ERROR ===');
+    console.error('Error:', error);
+    console.error('Error message:', error.message);
+    console.error('==========================');
+    
     return Response.json({
       success: false,
       error: error.message
