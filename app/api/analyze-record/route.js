@@ -1,4 +1,9 @@
+export const runtime = 'nodejs';
+export const maxDuration = 60; // 60 seconds for AI processing
+
 import Anthropic from '@anthropic-ai/sdk';
+
+// Rest of your code...
 
 // Debug logging
 console.log('ANTHROPIC_API_KEY exists:', !!process.env.ANTHROPIC_API_KEY);
