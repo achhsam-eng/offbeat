@@ -13,6 +13,21 @@ export function BottomNav({ activePage = "home" }: BottomNavProps) {
       style={{ backgroundColor: "#1E1E1E" }}
     >
       <div className="max-w-7xl mx-auto px-4">
+        <div className="text-center py-2 border-b border-gray-800">
+          <p className="text-[10px] text-gray-500">
+            This application uses Discogs&apos; API but is not affiliated with,
+            sponsored or endorsed by Discogs. &apos;Discogs&apos; is a trademark
+            of Zink Media, LLC. Data provided by{" "}
+            <a
+              href="https://www.discogs.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline"
+            >
+              Discogs
+            </a>
+          </p>
+        </div>
         <div className="flex justify-around py-3">
           <Link
             href="/"
